@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyCast Pro | Kartik Jadhav Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: #1a1a1a; min-height: 100vh; display: flex; justify-content: center; align-items: center; transition: 0.8s; padding: 20px; }
+        
+        .weather-card { 
+            width: 100%; max-width: 480px; background: rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(20px); padding: 30px; border-radius: 35px; 
+            border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 25px 50px rgba(0,0,0,0.5); 
+            text-align: center; color: white; position: relative;
+        }
+
+        .search-container { position: relative; margin-bottom: 15px; }
+        .search-box { 
+            display: flex; background: rgba(255,255,255,0.15); 
+            border-radius: 50px; padding: 10px 20px; gap: 10px; align-items: center;
+        }
+        .search-box input { background: transparent; border: none; outline: none; color: white; flex: 1; font-size: 1rem; }
+        
+        #suggestions {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: #303134; border-radius: 15px; list-style: none;
+            z-index: 10; margin-top: 5px; max-height: 200px; overflow-y: auto;
+            display: none; text-align: left; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        #suggestions li { padding: 12px 20px; border-bottom: 1px solid #3c4043; cursor: pointer; font-size: 0.9rem; }
+        #suggestions li:hover { background: #3c4043; }
+
+        .illustration { width: 100%; height: 150px; margin: 15px 0; display: flex; justify-content: center; }
+        .illustration img { max-height: 100%; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); }
+        
+        .temp { font-size: 5rem; font-weight: 600; margin: 5px 0; }
+        .hourly-scroll { display: flex; overflow-x: auto; gap: 15px; padding: 15px 0; border-top: 1px solid rgba(255,255,255,0.1); }
+        .hour-item { min-width: 75px; background: rgba(255,255,255,0.05); padding: 15px 10px; border-radius: 20px; text-align: center; }
+        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .col { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 20px; display: flex; align-items: center; gap: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="weather-card">
+    <div class="search-container">
+        <div class="search-box">
+            <input type="text" id="cityInput" placeholder="गाव किंवा शहर शोधा..." autocomplete="off">
+            <button onclick="getWeather()" title="Search" style="background:none; border:none; color:white; cursor:pointer;"><i class="fas fa-search"></i></button>
+            <button onclick="getMyLocation()" title="My Location" style="background:none; border:none; color:white; cursor:pointer;"><i class="fas fa-location-crosshairs"></i></button>
+        </div>
+        <ul id="suggestions"></ul> 
+    </div>
+    
+    <div id="weather-info">
+        <h2 id="c">SkyCast Pro</h2>
+        <p id="d" style="opacity: 0.7;">तुमचे शहर निवडा</p>
+        <div class="illustration">
+            <img id="main-art" src="https://www.gstatic.com/images/icons/material/apps/weather/2x/sunny_dark_color_96dp.png">
+        </div>
+        <h1 class="temp" id="t">--°C</h1>
+
+        <p style="text-align:left; font-size: 0.9rem; margin-bottom: 10px; opacity: 0.8;">पुढचे काही तास</p>
+        <div class="hourly-scroll" id="hourly"></div>
+
+        <div class="details">
+            <div class="col"><i class="fas fa-droplet"></i> <div><span id="humidity">--%</span><p style="font-size:0.7rem; opacity:0.6;">ओलावा</p></div></div>
+            <div class="col"><i class="fas fa-wind"></i> <div><span id="wind">-- km/h</span><p style="font-size:0.7rem; opacity:0.6;">वारा</p></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const apiKey = "9d674db9525205bcfbdc06e7b173340e";
+    const cityInput = document.getElementById("cityInput");
+    const suggestionsBox = document.getElementById("suggestions");
+
+    cityInput.addEventListener("input", async () => {
+        const query = cityInput.value.trim();
+        if (query.length < 3) { suggestionsBox.style.display = "none"; return; }
+        try {
+            const res = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${apiKey}`);
+            const cities = await res.json();
+            if (cities.length > 0) {
+                suggestionsBox.innerHTML = cities.map(city => 
+                    `<li onclick="selectCity('${city.name}', ${city.lat}, ${city.lon})">${city.name}, ${city.state || ''} (${city.country})</li>`
+                ).join("");
+                suggestionsBox.style.display = "block";
+            } else { suggestionsBox.style.display = "none"; }
+        } catch (err) { console.error("Error fetching suggestions"); }
+    });
+
+    // नाव फिक्स करण्यासाठी selectCity अपडेट केले
+    function selectCity(name, lat, lon) {
+        cityInput.value = name;
+        suggestionsBox.style.display = "none";
+        fetchWeatherByCoords(lat, lon, name); // सिलेक्ट केलेले नाव पाठवले
+    }
+
+    function getMyLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                fetchWeatherByCoords(position.coords.latitude, position.coords.longitude);
+            }, () => alert("GPS नाकारले! कृपया लोकेशन सेटिंग तपासा."));
+        }
+    }
+
+    async function getWeather() {
+        const city = cityInput.value.trim();
+        if(!city) return;
+        const res = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`);
+        const data = await res.json();
+        if(data.length > 0) fetchWeatherByCoords(data[0].lat, data[0].lon, data[0].name);
+        else alert("गाव सापडले नाही!");
+    }
+
+    // मुंबईचे नाव कोकण डिव्हिजन येऊ नये म्हणून selectedName चेक जोडला
+    async function fetchWeatherByCoords(lat, lon, selectedName = null) {
+        try {
+            const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=mr`);
+            const data = await weatherRes.json();
+            
+            // जर Suggestions मधून नाव आले असेल तर तेच वापरा, नाहीतर API चे नाव वापरा
+            document.getElementById("c").innerText = selectedName ? selectedName : data.name;
+            document.getElementById("t").innerText = Math.round(data.main.temp) + "°C";
+            document.getElementById("d").innerText = data.weather[0].description;
+            document.getElementById("humidity").innerText = data.main.humidity + "%";
+            document.getElementById("wind").innerText = data.wind.speed + " km/h";
+
+            updateArt(data.weather[0].main);
+            getForecast(lat, lon);
+        } catch (err) { console.error(err); }
+    }
+
+    async function getForecast(lat, lon) {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`);
+        const data = await res.json();
+        let html = "";
+        data.list.slice(0, 8).forEach(h => {
+            html += `<div class="hour-item"><p style="font-size:0.7rem;">${new Date(h.dt*1000).getHours()}:00</p><img src="https://openweathermap.org/img/wn/${h.weather[0].icon}.png" width="35"><p><b>${Math.round(h.main.temp)}°</b></p></div>`;
+        });
+        document.getElementById("hourly").innerHTML = html;
+    }
+
+    function updateArt(cond) {
+        const art = document.getElementById("main-art");
+        if(cond === "Clear") { 
+            art.src = "https://www.gstatic.com/images/icons/material/apps/weather/2x/sunny_dark_color_96dp.png"; 
+            document.body.style.background = "#1a73e8"; 
+        } else if(cond === "Clouds") { 
+            art.src = "https://www.gstatic.com/images/icons/material/apps/weather/2x/cloudy_dark_color_96dp.png"; 
+            document.body.style.background = "#5f6368"; 
+        } else { 
+            art.src = "https://www.gstatic.com/images/icons/material/apps/weather/2x/rain_dark_color_96dp.png"; 
+            document.body.style.background = "#3c4043"; 
+        }
+    }
+
+    cityInput.addEventListener("keypress", (e) => { if (e.key === "Enter") getWeather(); });
+</script>
+</body>
+</html>
