@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kartik's Wallet Manager</title>
+    <style>
+        body { font-family: 'Poppins', sans-serif; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { width: 380px; background: #1e293b; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); transition: transform 0.3s ease; }
+        .container:hover { transform: translateY(-5px); }
+        .budget-card { background: #334155; padding: 15px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #fbbf24; transition: all 0.5s ease; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid transparent; background: #475569; color: white; box-sizing: border-box; transition: 0.3s ease; }
+        input:focus, select:focus { border-color: #38bdf8; background: #1e293b; outline: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+        button { width: 100%; padding: 12px; background: #38bdf8; border: none; border-radius: 8px; color: #0f172a; font-weight: bold; cursor: pointer; transition: all 0.3s ease; margin-top: 5px; }
+        button:hover { background: #0ea5e9; transform: scale(1.03); box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4); }
+        .balance-text { font-size: 1.5rem; color: #4ade80; font-weight: bold; }
+        .expense-list { list-style: none; padding: 0; margin-top: 20px; width: 100%; }
+        li { background: #334155; padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid #ef4444; animation: fadeIn 0.4s ease; transition: 0.3s ease; }
+        li:hover { background: #475569; transform: translateX(5px); }
+        .date-text { font-size: 0.75rem; color: #94a3b8; display: block; } /* Navin Date Style */
+        .delete-btn { background: #ef4444; border: none; color: white; padding: 6px 10px; border-radius: 5px; cursor: pointer; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .danger-border { border-left: 5px solid #ef4444 !important; background: #451a1a !important; }
+        .warning-border { border-left: 5px solid #fbbf24 !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>💰 Wallet Manager</h2>
+    
+    <div class="budget-card" id="budgetCard">
+        <label>Tujhyakade kiti paise ahet?</label>
+        <input type="number" id="totalBudget" placeholder="Ex. 5000" oninput="updateUI()">
+        <div>Urlele Paise: <span class="balance-text" id="balanceDisplay">₹<span id="remainingBalance">0</span></span></div>
+    </div>
+
+    <hr style="border: 0.5px solid #475569; width: 100%;">
+
+    <input type="text" id="itemName" placeholder="Kashala paise kharchele?">
+    <input type="number" id="amount" placeholder="Kiti paise?">
+    <select id="category">
+        <option value="🍔 Food">🍔 Food</option>
+        <option value="🚗 Travel">🚗 Travel</option>
+        <option value="🏠 Rent">🏠 Rent/Bills</option>
+        <option value="🛍️ Shopping">🛍️ Shopping</option>
+        <option value="✨ Other">✨ Other</option>
+    </select>
+    <button onclick="addExpense()">Add Kharch</button>
+
+    <ul id="expenseList" class="expense-list"></ul>
+    <h4 style="color: #cbd5e1;">Ekun Kharch: ₹<span id="totalExpense">0</span></h4>
+</div>
+
+<script>
+    let expenses = JSON.parse(localStorage.getItem('walletEx')) || [];
+    let budget = localStorage.getItem('myBudget') || 0;
+
+    document.getElementById("totalBudget").value = budget;
+
+    function updateUI() {
+        const list = document.getElementById("expenseList");
+        const totalExpSpan = document.getElementById("totalExpense");
+        const remainSpan = document.getElementById("remainingBalance");
+        const balanceDisplay = document.getElementById("balanceDisplay");
+        const budgetCard = document.getElementById("budgetCard");
+        
+        budget = document.getElementById("totalBudget").value || 0;
+        localStorage.setItem('myBudget', budget);
+
+        list.innerHTML = "";
+        let totalExp = 0;
+
+        expenses.forEach((ex, index) => {
+            let li = document.createElement("li");
+            // Yethhe Date display kela aahe
+            li.innerHTML = `<div>
+                                <span class="date-text">${ex.date}</span>
+                                <span><b>${ex.cat}:</b> ${ex.name}</span>
+                            </div> 
+                            <span>₹${ex.amt} <button class="delete-btn" onclick="deleteEx(${index})">X</button></span>`;
+            list.appendChild(li);
+            totalExp += parseInt(ex.amt);
+        });
+
+        totalExpSpan.innerText = totalExp;
+        let finalBalance = budget - totalExp;
+        remainSpan.innerText = finalBalance;
+
+        if (finalBalance < 0) {
+            balanceDisplay.style.color = "#ef4444"; 
+            budgetCard.classList.add("danger-border");
+        } else if (finalBalance < 500 && finalBalance > 0) {
+            balanceDisplay.style.color = "#fbbf24"; 
+            budgetCard.classList.add("warning-border");
+        } else {
+            balanceDisplay.style.color = "#4ade80"; 
+            budgetCard.classList.remove("danger-border", "warning-border");
+        }
+        
+        localStorage.setItem('walletEx', JSON.stringify(expenses));
+    }
+
+    function addExpense() {
+        let name = document.getElementById("itemName").value;
+        let amt = document.getElementById("amount").value;
+        let cat = document.getElementById("category").value;
+
+        if(!name || !amt) return alert("Pahile mahiti tak bhava!");
+        
+        // Automatic Date aani Time ghenyasathi
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB') + " | " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        expenses.push({ name, amt, cat, date: dateStr });
+        document.getElementById("itemName").value = "";
+        document.getElementById("amount").value = "";
+        updateUI();
+    }
+
+    function deleteEx(i) {
+        if(confirm("Ha kharch kadhaycha ka?")) {
+            expenses.splice(i, 1);
+            updateUI();
+        }
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
